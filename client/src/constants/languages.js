@@ -1,0 +1,17 @@
+export const LANGUAGES = [
+    { label: 'Russian', code: 'ru', voice: 'ru-RU', dir: 'ltr' },
+    { label: 'Portuguese', code: 'pt', voice: 'pt-BR', dir: 'ltr' },
+    { label: 'Spanish', code: 'es', voice: 'es-ES', dir: 'ltr' },
+    { label: 'Afrikaans', code: 'af', voice: 'af-ZA', dir: 'ltr' },
+    { label: 'Vietnamese', code: 'vi', voice: 'vi-VN', dir: 'ltr' },
+    { label: 'Hindi', code: 'hi', voice: 'hi-IN', dir: 'ltr' },
+    { label: 'Chinese (Mandarin)', code: 'zh', voice: 'cmn-CN', dir: 'ltr' },
+    { label: 'Arabic', code: 'ar', voice: 'ar-XA', dir: 'rtl' },
+    { label: 'Persian', code: 'fa', voice: 'fa-IR', dir: 'rtl' },
+    { label: 'Amharic', code: 'am', voice: 'am-ET', dir: 'ltr' },
+    { label: 'Indonesian', code: 'id', voice: 'id-ID', dir: 'ltr' },
+    { label: 'Kazakh', code: 'kk', voice: 'kk-KZ', dir: 'ltr' },
+    { label: 'Thai', code: 'th', voice: 'th-TH', dir: 'ltr' },
+    { label: 'Swahili', code: 'sw', voice: 'sw-KE', dir: 'ltr' },
+    { label: 'Uzbek', code: 'uz', voice: 'uz-UZ', dir: 'ltr' },
+];

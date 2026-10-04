@@ -1,0 +1,139 @@
+.app-container {
+    max-width: 680px;
+    margin: 40px auto;
+    padding: 24px;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #1f2937;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+header h1 {
+    margin-bottom: 8px;
+    font-size: 26px;
+}
+
+header p {
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.selector-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+select {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    font-size: 16px;
+    background-color: #ffffff;
+}
+
+.recorder-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, background-color 0.2s;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-record {
+    background-color: #2563eb;
+    color: #ffffff;
+}
+
+.btn-record:hover:not(:disabled) {
+    background-color: #1d4ed8;
+}
+
+.btn-stop {
+    background-color: #dc2626;
+    color: #ffffff;
+}
+
+.btn-stop:hover {
+    background-color: #b91c1c;
+}
+
+.visualizer-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60px;
+    background-color: #f9fafb;
+    border-radius: 6px;
+    border: 1px dashed #e5e7eb;
+}
+
+.visualizer-canvas {
+    display: block;
+}
+
+.status-indicator {
+    font-size: 14px;
+    color: #4b5563;
+    font-style: italic;
+}
+
+.transcript-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.transcript-box h3 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 16px;
+}
+
+.transcript-text {
+    font-size: 18px;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.audio-player-box {
+    margin-top: 10px;
+}
+
+.audio-player-box h4 {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+
+audio {
+    width: 100%;
+}

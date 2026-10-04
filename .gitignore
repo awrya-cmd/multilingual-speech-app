@@ -1,0 +1,33 @@
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Python Virtual Environments & Cache
+venv/
+*/venv/
+__pycache__/
+*/__pycache__/
+*.py[cod]
+
+# Environment secrets
+.env
+*/.env
+*.env.local
+
+# Temporary audio artifacts
+uploads/
+*/uploads/*
+!*/uploads/.gitkeep
+
+# Build artifacts
+dist/
+build/
+*/dist/
+
+# IDE / Editor settings
+.vscode/
+.idea/
