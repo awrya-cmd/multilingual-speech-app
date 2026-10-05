@@ -1,6 +1,9 @@
+Here is the cleanly formatted, complete `README.md` ready to copy and paste directly into your project root:
+
+```markdown
 # Multilingual Speech Translation Loop
 
-A 100% free, end-to-end speech-to-speech translation loop built with React (Vite), Node.js Express, `faster-whisper`, and `edge-tts`.
+A 100% free, cross-platform, end-to-end speech-to-speech translation application built with React (Vite), Node.js Express, `faster-whisper`, and `edge-tts`.
 
 ---
 
@@ -11,15 +14,39 @@ A 100% free, end-to-end speech-to-speech translation loop built with React (Vite
 - **Searchable Language Selection**: Dual dropdowns with inline search, alphabetically organized.
 - **Editable Transcript**: Modify text directly; speech auto-regenerates with an intelligent debounce pause.
 - **Neural Voice Output**: Reads the translation aloud using Microsoft `edge-tts` neural voices.
-- **Dynamic Visualizer**: 4-bar vertical pill audio modulator rendered in a butter-yellow theme.
+- **Dynamic Visualizer**: 4-bar vertical pill audio modulator styled in a warm butter-yellow theme.
+- **Cross-Platform**: Seamlessly runs on Windows, macOS, and Linux.
 
 ---
 
 ## Prerequisites
 
 - **Node.js** (v18+)
-- **Python** (v3.9 - v3.11 recommended)
+- **Python** (v3.9 – v3.12)
 - **FFmpeg** installed and accessible in your system `PATH`
+
+### Installing FFmpeg
+
+- **Windows (PowerShell):**
+  ```powershell
+  winget install Gyan.FFmpeg
+
+```
+
+* **macOS (Homebrew):**
+```bash
+brew install ffmpeg
+
+```
+
+
+* **Linux (Ubuntu/Debian):**
+```bash
+sudo apt update && sudo apt install -y ffmpeg
+
+```
+
+
 
 ---
 
@@ -37,6 +64,7 @@ multilingual-speech-app/
 │       └── App.css
 ├── server/              # Node.js + Python backend
 │   ├── package.json
+│   ├── requirements.txt
 │   ├── server.js
 │   ├── transcribe.py
 │   ├── synthesize.py
@@ -60,49 +88,37 @@ cd multilingual-speech-app
 
 ### 2. Backend Setup
 
-Navigate into the `server` directory, create a virtual environment, and install dependencies:
+Navigate into the `server` directory and install Node dependencies:
 
 ```bash
 cd server
 npm install
 
-# Create virtual environment
+```
+
+Create and activate a Python virtual environment:
+
+* **Windows (PowerShell):**
+```powershell
 python -m venv venv
-
-# Activate virtual environment
-# Windows (PowerShell):
 .\venv\Scripts\Activate.ps1
-# Mac/Linux:
+
+```
+
+
+* **macOS / Linux:**
+```bash
+python3 -m venv venv
 source venv/bin/activate
 
-# Install Python packages
-pip install faster-whisper edge-tts requests
+```
 
 
-### Virtual Environment Activation
 
-- **Windows (PowerShell):**
-  ```powershell
-  .\venv\Scripts\Activate.ps1
-macOS / Linux:
+Install Python dependencies:
 
-Bash
-source venv/bin/activate
-FFmpeg Installation
-Windows:
-
-PowerShell
-winget install Gyan.FFmpeg
-macOS (Homebrew):
-
-Bash
-brew install ffmpeg
-Linux (Ubuntu/Debian):
-
-Bash
-sudo apt update && sudo apt install -y ffmpeg
-
-All data contracts, APIs, transcription parameters, UI styling, and synthesis loops remain completely untouched.
+```bash
+pip install -r requirements.txt
 
 ```
 
@@ -122,32 +138,36 @@ npm install
 
 ### 1. Start the Backend
 
-From the `server` folder:
+From the `server/` directory:
 
 ```bash
 npm start
 
 ```
 
-*Server runs on `http://localhost:5000`.*
+*Backend runs on `http://localhost:5000`.*
 
 ### 2. Start the Frontend
 
-From the `client` folder:
+From the `client/` directory:
 
 ```bash
 npm run dev
 
 ```
 
-*App opens on `http://localhost:5173`.*
+*Frontend runs on `http://localhost:5173`.*
 
 ---
 
 ## How It Works
 
 1. **Record Audio**: Speak via the browser microphone; audio is captured as `.webm`.
-2. **STT (Speech-to-Text)**: Node calls `transcribe.py` where `faster-whisper` transcribes audio into native script.
-3. **Translation**: The transcript translates automatically to the selected target language.
-4. **TTS (Text-to-Speech)**: `synthesize.py` uses Microsoft Edge Neural Voice models to generate clean `.mp3` audio.
-5. **Interactive Loop**: Any edits made inside the transcript textarea automatically translate and re-synthesize speech after you pause typing.
+2. **STT (Speech-to-Text)**: Node streams the audio to `transcribe.py` where `faster-whisper` transcribes speech into native script.
+3. **Translation**: The transcript is translated into the selected target language.
+4. **TTS (Text-to-Speech)**: `synthesize.py` invokes Microsoft Edge Neural Voice models to generate clean `.mp3` audio.
+5. **Interactive Loop**: Any edits made inside the transcript textarea automatically translate and re-synthesize speech after a brief typing pause.
+
+```
+
+```
