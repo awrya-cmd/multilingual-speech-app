@@ -1,13 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
-import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execFile, spawn } from 'child_process';
-
-dotenv.config();
+import { spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,73 +12,77 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Enable CORS and expose custom header for translated text
 app.use(cors({
     exposedHeaders: ['X-Translated-Text'],
 }));
 
 app.use(express.json());
 
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname) || '.webm';
-        cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
-    },
-});
+// In-memory file storage - zero hard drive writes
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-const pythonExecutable = path.join(__dirname, 'venv', 'Scripts', 'python.exe');
+// Cross-platform Python resolver
+const venvWindowsPath = path.join(__dirname, 'venv', 'Scripts', 'python.exe');
+const venvPosixPath = path.join(__dirname, 'venv', 'bin', 'python');
+
+let pythonExecutable;
+if (fs.existsSync(venvWindowsPath)) {
+    pythonExecutable = venvWindowsPath;
+} else if (fs.existsSync(venvPosixPath)) {
+    pythonExecutable = venvPosixPath;
+} else {
+    pythonExecutable = process.platform === 'win32' ? 'python' : 'python3';
+}
+
 const transcribeScript = path.join(__dirname, 'transcribe.py');
 const synthesizeScript = path.join(__dirname, 'synthesize.py');
 
-// 1. Transcription Route
+// 1. In-Memory Transcription Route
 app.post('/api/transcribe', upload.single('audio'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'No audio file uploaded.' });
+    if (!req.file || !req.file.buffer) {
+        return res.status(400).json({ error: 'No audio data received.' });
     }
 
-    const audioPath = path.resolve(req.file.path);
     const inputLang = req.body.language || '';
+    const pyProcess = spawn(pythonExecutable, [transcribeScript, inputLang]);
 
-    console.log(`[STT] Processing audio (Language constraint: ${inputLang || 'auto'})...`);
+    let stdoutData = '';
+    let stderrData = '';
 
-    execFile(
-        pythonExecutable,
-        [transcribeScript, audioPath, inputLang],
-        { maxBuffer: 1024 * 1024 * 10 },
-        (error, stdout, stderr) => {
-            if (fs.existsSync(audioPath)) {
-                fs.unlinkSync(audioPath);
-            }
+    pyProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString('utf-8');
+    });
 
-            if (error) {
-                console.error('[STT Error]:', stderr || error.message);
-                return res.status(500).json({ error: 'Transcription failed' });
-            }
+    pyProcess.stderr.on('data', (data) => {
+        stderrData += data.toString('utf-8');
+    });
 
-            try {
-                const result = JSON.parse(stdout.trim());
-                console.log(`[STT Output - ${result.detected_language} (${result.detected_code})]:`, result.transcript);
-                res.json({
-                    transcript: result.transcript,
-                    detectedLanguage: result.detected_language,
-                    detectedCode: result.detected_code,
-                });
-            } catch (parseErr) {
-                console.error('Failed to parse STT output:', stdout);
-                res.status(500).json({ error: 'Invalid transcription format' });
-            }
+    pyProcess.on('close', (code) => {
+        if (code !== 0) {
+            console.error('[STT Error]:', stderrData);
+            return res.status(500).json({ error: 'Transcription failed' });
         }
-    );
+
+        try {
+            const result = JSON.parse(stdoutData.trim());
+            res.json({
+                transcript: result.transcript,
+                detectedLanguage: result.detected_language,
+                detectedCode: result.detected_code,
+            });
+        } catch (parseErr) {
+            console.error('Failed to parse STT output:', stdoutData);
+            res.status(500).json({ error: 'Invalid transcription format' });
+        }
+    });
+
+    // Pipe the browser's audio buffer directly to Python stdin
+    pyProcess.stdin.write(req.file.buffer);
+    pyProcess.stdin.end();
 });
 
-// 2. Translation & Synthesis Route
+// 2. In-Memory Synthesis Route
 app.post('/api/synthesize', (req, res) => {
     const { text, voiceCode } = req.body;
 
@@ -89,53 +90,45 @@ app.post('/api/synthesize', (req, res) => {
         return res.status(400).json({ error: 'Text and voiceCode are required.' });
     }
 
-    const outputPath = path.join(uploadDir, `tts_${Date.now()}.mp3`);
     const pyProcess = spawn(pythonExecutable, [synthesizeScript]);
-
-    const payload = JSON.stringify({
-        text,
-        voiceCode,
-        outputPath,
-    });
-
-    let stdoutData = '';
-    let stderrData = '';
-
-    pyProcess.stdin.write(payload);
-    pyProcess.stdin.end();
-
-    pyProcess.stdout.on('data', (data) => {
-        stdoutData += data.toString();
-    });
+    let translatedText = text;
+    let headersSent = false;
 
     pyProcess.stderr.on('data', (data) => {
-        stderrData += data.toString();
+        const lines = data.toString('utf-8').split('\n');
+        for (const line of lines) {
+            if (line.startsWith('META_TRANSLATION:')) {
+                try {
+                    const meta = JSON.parse(line.replace('META_TRANSLATION:', ''));
+                    translatedText = meta.translated_text;
+                } catch (_) { }
+            }
+        }
+    });
+
+    pyProcess.stdout.on('data', (chunk) => {
+        if (!headersSent) {
+            res.setHeader('Content-Type', 'audio/mpeg');
+            res.setHeader('X-Translated-Text', encodeURIComponent(translatedText));
+            headersSent = true;
+        }
+        res.write(chunk);
     });
 
     pyProcess.on('close', (code) => {
         if (code !== 0) {
-            console.error('TTS error:', stderrData);
-            return res.status(500).json({ error: 'Speech synthesis failed' });
+            if (!headersSent) {
+                return res.status(500).json({ error: 'Speech synthesis failed' });
+            }
         }
-
-        let translatedText = text;
-        try {
-            const parsed = JSON.parse(stdoutData.trim());
-            translatedText = parsed.translated_text;
-        } catch (_) { }
-
-        res.setHeader('X-Translated-Text', encodeURIComponent(translatedText));
-        res.sendFile(outputPath, (err) => {
-            if (fs.existsSync(outputPath)) {
-                fs.unlinkSync(outputPath);
-            }
-            if (err && !res.headersSent) {
-                res.status(500).json({ error: 'Failed to stream audio file' });
-            }
-        });
+        res.end();
     });
+
+    // Send request JSON to Python stdin
+    pyProcess.stdin.write(JSON.stringify({ text, voiceCode }));
+    pyProcess.stdin.end();
 });
 
 app.listen(PORT, () => {
-    console.log(`Backend server running on http://localhost:${PORT}`);
+    console.log(`Backend server running in-memory on http://localhost:${PORT}`);
 });

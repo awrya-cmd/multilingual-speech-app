@@ -6,8 +6,8 @@ import urllib.parse
 import requests
 import edge_tts
 
+# Handle cross-platform stdio
 sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 VOICE_MAP = {
@@ -46,7 +46,6 @@ VOICE_MAP = {
 }
 
 def translate_free(text: str, target_lang: str) -> str:
-    # Google RPC endpoint
     try:
         url = "https://translate.googleapis.com/translate_a/single"
         params = {
@@ -66,7 +65,6 @@ def translate_free(text: str, target_lang: str) -> str:
     except Exception as e:
         sys.stderr.write(f"Google RPC error: {str(e)}\n")
 
-    # MyMemory fallback
     try:
         encoded = urllib.parse.quote(text)
         url = f"https://api.mymemory.translated.net/get?q={encoded}&langpair=autodetect|{target_lang}"
@@ -81,17 +79,22 @@ def translate_free(text: str, target_lang: str) -> str:
 
     return text
 
-async def run_pipeline(text: str, voice_code: str, output_path: str):
+async def run_pipeline(text: str, voice_code: str):
     voice_info = VOICE_MAP.get(voice_code, ('en-US-JennyNeural', 'en'))
     voice = voice_info[0]
     target_lang = voice_info[1]
 
     translated_text = translate_free(text, target_lang)
 
-    communicate = edge_tts.Communicate(translated_text, voice)
-    await communicate.save(output_path)
+    # Send the translated text metadata via stderr line prefix so stdout stays clean pure binary
+    sys.stderr.write(f"META_TRANSLATION:{json.dumps({'translated_text': translated_text}, ensure_ascii=False)}\n")
+    sys.stderr.flush()
 
-    print(json.dumps({"translated_text": translated_text}, ensure_ascii=False))
+    communicate = edge_tts.Communicate(translated_text, voice)
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            sys.stdout.buffer.write(chunk["data"])
+            sys.stdout.buffer.flush()
 
 if __name__ == "__main__":
     try:
@@ -99,12 +102,11 @@ if __name__ == "__main__":
         payload = json.loads(raw_in)
         text_input = payload.get("text", "").strip()
         voice_code = payload.get("voiceCode", "")
-        out_file = payload.get("outputPath", "")
 
-        if not text_input or not out_file:
+        if not text_input:
             sys.exit(0)
 
-        asyncio.run(run_pipeline(text_input, voice_code, out_file))
+        asyncio.run(run_pipeline(text_input, voice_code))
     except Exception as e:
         sys.stderr.write(f"TTS Error: {str(e)}\n")
         sys.exit(1)

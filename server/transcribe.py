@@ -1,10 +1,11 @@
 import sys
-import os
 import io
 import json
 import subprocess
+import numpy as np
 from faster_whisper import WhisperModel
 
+# Ensure UTF-8 output across all platforms
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
@@ -17,32 +18,43 @@ LANGUAGE_NAMES = {
     'sw': 'Swahili', 'th': 'Thai', 'uz': 'Uzbek', 'vi': 'Vietnamese'
 }
 
-def extract_audio(input_path: str, output_wav_path: str):
-    command = [
-        "ffmpeg", "-y", "-i", input_path,
-        "-vn", "-ar", "16000", "-ac", "1",
-        output_wav_path
+def decode_audio_in_memory(raw_bytes: bytes) -> np.ndarray:
+    """Use FFmpeg to decode incoming stream bytes into 16kHz mono float32 array in RAM."""
+    cmd = [
+        "ffmpeg", "-y", "-i", "pipe:0",
+        "-f", "s16le", "-acodec", "pcm_s16le",
+        "-ar", "16000", "-ac", "1",
+        "pipe:1"
     ]
-    # stdin/stdout/stderr mapped safely for all platforms
-    subprocess.run(
-        command,
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL
+    process = subprocess.Popen(
+        cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL
     )
+    out_bytes, _ = process.communicate(input=raw_bytes)
+    
+    if process.returncode != 0:
+        raise RuntimeError("FFmpeg in-memory audio decoding failed")
 
-def transcribe(input_audio_path: str, chosen_lang: str = None):
-    temp_audio_path = input_audio_path.rsplit(".", 1)[0] + "_audio.wav"
+    # Convert PCM s16le bytes to float32 normalized for Whisper (-1.0 to 1.0)
+    audio = np.frombuffer(out_bytes, np.int16).flatten().astype(np.float32) / 32768.0
+    return audio
 
+def transcribe_stream(chosen_lang: str = None):
     try:
-        extract_audio(input_audio_path, temp_audio_path)
+        raw_audio_bytes = sys.stdin.buffer.read()
+        if not raw_audio_bytes:
+            sys.stderr.write("STT Error: Empty audio stream received\n")
+            sys.exit(1)
+
+        audio_array = decode_audio_in_memory(raw_audio_bytes)
 
         use_auto = (not chosen_lang) or (chosen_lang.strip().lower() in ["auto", "", "null", "undefined"])
         target_lang = None if use_auto else chosen_lang.strip().lower()
 
         segments, info = whisper_model.transcribe(
-            temp_audio_path,
+            audio_array,
             language=target_lang,
             task="transcribe",
             beam_size=3,
@@ -69,14 +81,7 @@ def transcribe(input_audio_path: str, chosen_lang: str = None):
     except Exception as e:
         sys.stderr.write(f"STT Error: {str(e)}\n")
         sys.exit(1)
-    finally:
-        if os.path.exists(temp_audio_path):
-            os.remove(temp_audio_path)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.exit(1)
-
-    audio_file = sys.argv[1]
-    lang_arg = sys.argv[2] if len(sys.argv) > 2 else None
-    transcribe(audio_file, lang_arg)
+    lang_arg = sys.argv[1] if len(sys.argv) > 1 else None
+    transcribe_stream(lang_arg)
