@@ -1,35 +1,110 @@
 import sys
+import io
+import json
 import asyncio
+import urllib.parse
+import requests
 import edge_tts
 
+sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 VOICE_MAP = {
-    'ru-RU': 'ru-RU-SvetlanaNeural',
-    'pt-BR': 'pt-BR-FranciscaNeural',
-    'es-ES': 'es-ES-ElviraNeural',
-    'af-ZA': 'af-ZA-AdriNeural',
-    'vi-VN': 'vi-VN-HoaiMyNeural',
-    'hi-IN': 'hi-IN-SwaraNeural',
-    'cmn-CN': 'zh-CN-XiaoxiaoNeural',
-    'ar-XA': 'ar-SA-ZariyahNeural',
-    'fa-IR': 'fa-IR-DilaraNeural',
-    'am-ET': 'am-ET-MekdesNeural',
-    'id-ID': 'id-ID-GadisNeural',
-    'kk-KZ': 'kk-KZ-AigulNeural',
-    'th-TH': 'th-TH-PremwadeeNeural',
-    'sw-KE': 'sw-KE-ZuriNeural',
-    'uz-UZ': 'uz-UZ-MadinaNeural',
+    'en': ('en-US-JennyNeural', 'en'),
+    'en-US': ('en-US-JennyNeural', 'en'),
+    'ru': ('ru-RU-SvetlanaNeural', 'ru'),
+    'ru-RU': ('ru-RU-SvetlanaNeural', 'ru'),
+    'pt': ('pt-BR-FranciscaNeural', 'pt'),
+    'pt-BR': ('pt-BR-FranciscaNeural', 'pt'),
+    'es': ('es-ES-ElviraNeural', 'es'),
+    'es-ES': ('es-ES-ElviraNeural', 'es'),
+    'af': ('af-ZA-AdriNeural', 'af'),
+    'af-ZA': ('af-ZA-AdriNeural', 'af'),
+    'vi': ('vi-VN-HoaiMyNeural', 'vi'),
+    'vi-VN': ('vi-VN-HoaiMyNeural', 'vi'),
+    'hi': ('hi-IN-SwaraNeural', 'hi'),
+    'hi-IN': ('hi-IN-SwaraNeural', 'hi'),
+    'zh': ('zh-CN-XiaoxiaoNeural', 'zh-CN'),
+    'cmn-CN': ('zh-CN-XiaoxiaoNeural', 'zh-CN'),
+    'ar': ('ar-SA-ZariyahNeural', 'ar'),
+    'ar-XA': ('ar-SA-ZariyahNeural', 'ar'),
+    'fa': ('fa-IR-DilaraNeural', 'fa'),
+    'fa-IR': ('fa-IR-DilaraNeural', 'fa'),
+    'am': ('am-ET-MekdesNeural', 'am'),
+    'am-ET': ('am-ET-MekdesNeural', 'am'),
+    'id': ('id-ID-GadisNeural', 'id'),
+    'id-ID': ('id-ID-GadisNeural', 'id'),
+    'kk': ('kk-KZ-AigulNeural', 'kk'),
+    'kk-KZ': ('kk-KZ-AigulNeural', 'kk'),
+    'th': ('th-TH-PremwadeeNeural', 'th'),
+    'th-TH': ('th-TH-PremwadeeNeural', 'th'),
+    'sw': ('sw-KE-ZuriNeural', 'sw'),
+    'sw-KE': ('sw-KE-ZuriNeural', 'sw'),
+    'uz': ('uz-UZ-MadinaNeural', 'uz'),
+    'uz-UZ': ('uz-UZ-MadinaNeural', 'uz'),
 }
 
-async def generate_speech(text, voice_code, output_path):
-    voice = VOICE_MAP.get(voice_code, 'en-US-JennyNeural')
-    communicate = edge_tts.Communicate(text, voice)
+def translate_free(text: str, target_lang: str) -> str:
+    # Google RPC endpoint
+    try:
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            "client": "gtx",
+            "sl": "auto",
+            "tl": target_lang,
+            "dt": "t",
+            "q": text,
+        }
+        headers = {"User-Agent": "Mozilla/5.0"}
+        resp = requests.get(url, params=params, headers=headers, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            translated = "".join([segment[0] for segment in data[0] if segment[0]])
+            if translated.strip():
+                return translated.strip()
+    except Exception as e:
+        sys.stderr.write(f"Google RPC error: {str(e)}\n")
+
+    # MyMemory fallback
+    try:
+        encoded = urllib.parse.quote(text)
+        url = f"https://api.mymemory.translated.net/get?q={encoded}&langpair=autodetect|{target_lang}"
+        resp = requests.get(url, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            translated = data.get("responseData", {}).get("translatedText", "")
+            if translated and not translated.startswith("MYMEMORY WARNING"):
+                return translated.strip()
+    except Exception as e:
+        sys.stderr.write(f"MyMemory error: {str(e)}\n")
+
+    return text
+
+async def run_pipeline(text: str, voice_code: str, output_path: str):
+    voice_info = VOICE_MAP.get(voice_code, ('en-US-JennyNeural', 'en'))
+    voice = voice_info[0]
+    target_lang = voice_info[1]
+
+    translated_text = translate_free(text, target_lang)
+
+    communicate = edge_tts.Communicate(translated_text, voice)
     await communicate.save(output_path)
 
-if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        sys.exit(1)
+    print(json.dumps({"translated_text": translated_text}, ensure_ascii=False))
 
-    text_input = sys.argv[1]
-    voice_code = sys.argv[2]
-    out_file = sys.argv[3]
-    asyncio.run(generate_speech(text_input, voice_code, out_file))
+if __name__ == "__main__":
+    try:
+        raw_in = sys.stdin.read()
+        payload = json.loads(raw_in)
+        text_input = payload.get("text", "").strip()
+        voice_code = payload.get("voiceCode", "")
+        out_file = payload.get("outputPath", "")
+
+        if not text_input or not out_file:
+            sys.exit(0)
+
+        asyncio.run(run_pipeline(text_input, voice_code, out_file))
+    except Exception as e:
+        sys.stderr.write(f"TTS Error: {str(e)}\n")
+        sys.exit(1)

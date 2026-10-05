@@ -9,11 +9,6 @@ export default function AudioVisualizer({ stream, isRecording }) {
             if (animationFrameIdRef.current) {
                 cancelAnimationFrame(animationFrameIdRef.current);
             }
-            const canvas = canvasRef.current;
-            if (canvas) {
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-            }
             return;
         }
 
@@ -22,34 +17,51 @@ export default function AudioVisualizer({ stream, isRecording }) {
         const analyserNode = audioContext.createAnalyser();
 
         analyserNode.fftSize = 64;
+        analyserNode.smoothingTimeConstant = 0.8;
         sourceNode.connect(analyserNode);
 
         const bufferLength = analyserNode.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
         const canvas = canvasRef.current;
-        const canvasCtx = canvas.getContext('2d');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        // Warm pastel butter & soft amber palette
+        const barColor = '#d97706';
 
         const draw = () => {
             animationFrameIdRef.current = requestAnimationFrame(draw);
             analyserNode.getByteFrequencyData(dataArray);
 
-            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            const barWidth = (canvas.width / bufferLength) * 1.5;
-            let x = 0;
+            const numBars = 4;
+            const barWidth = 7;
+            const gap = 8;
+            const totalWidth = numBars * barWidth + (numBars - 1) * gap;
+            let startX = (canvas.width - totalWidth) / 2;
+            const centerY = canvas.height / 2;
 
-            for (let i = 0; i < bufferLength; i++) {
-                const barHeight = (dataArray[i] / 255) * canvas.height;
+            for (let i = 0; i < numBars; i++) {
+                const binIndex = Math.min(i * 3 + 2, bufferLength - 1);
+                const amplitude = dataArray[binIndex] / 255;
 
-                canvasCtx.fillStyle = '#2563eb';
-                canvasCtx.fillRect(
-                    x,
-                    canvas.height - barHeight,
-                    barWidth - 2,
-                    barHeight
+                const minHeight = 8;
+                const maxHeight = 34;
+                const barHeight = minHeight + amplitude * (maxHeight - minHeight);
+
+                ctx.fillStyle = barColor;
+                ctx.beginPath();
+                ctx.roundRect(
+                    startX,
+                    centerY - barHeight / 2,
+                    barWidth,
+                    barHeight,
+                    barWidth / 2
                 );
+                ctx.fill();
 
-                x += barWidth;
+                startX += barWidth + gap;
             }
         };
 
@@ -65,13 +77,15 @@ export default function AudioVisualizer({ stream, isRecording }) {
         };
     }, [isRecording, stream]);
 
+    if (!isRecording) return null;
+
     return (
-        <div className="visualizer-container">
+        <div className="voice-modulator-wrapper">
             <canvas
                 ref={canvasRef}
-                width="400"
-                height="60"
-                className="visualizer-canvas"
+                width="120"
+                height="46"
+                className="voice-modulator-canvas"
             />
         </div>
     );

@@ -1,6 +1,0 @@
-node_modules/
-venv/
-uploads/*
-!.gitkeep
-.env
-__pycache__/

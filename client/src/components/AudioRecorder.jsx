@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import AudioVisualizer from './AudioVisualizer';
 
-export default function AudioRecorder({ onRecordingComplete, disabled, selectedLanguage }) {
+export default function AudioRecorder({ onRecordingComplete, disabled }) {
     const [isRecording, setIsRecording] = useState(false);
     const [activeStream, setActiveStream] = useState(null);
     const mediaRecorderRef = useRef(null);
@@ -69,7 +69,7 @@ export default function AudioRecorder({ onRecordingComplete, disabled, selectedL
                         onClick={startRecording}
                         disabled={disabled}
                     >
-                        Start Recording ({selectedLanguage.label})
+                        Start Recording
                     </button>
                 ) : (
                     <button className="btn btn-stop" onClick={stopRecording}>
@@ -78,7 +78,7 @@ export default function AudioRecorder({ onRecordingComplete, disabled, selectedL
                 )}
             </div>
 
-            <AudioVisualizer stream={activeStream} isRecording={isRecording} />
+            {isRecording && <AudioVisualizer stream={activeStream} isRecording={isRecording} />}
         </div>
     );
 }

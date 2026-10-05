@@ -31,3 +31,14 @@ build/
 # IDE / Editor settings
 .vscode/
 .idea/
+
+node_modules/
+venv/
+uploads/
+*.mp3
+*.wav
+*.webm
+__pycache__/
+.env
+.DS_Store
+dist/

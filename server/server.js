@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 
 dotenv.config();
 
@@ -15,7 +15,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// Enable CORS and expose custom header for translated text
+app.use(cors({
+    exposedHeaders: ['X-Translated-Text'],
+}));
+
 app.use(express.json());
 
 const uploadDir = path.join(__dirname, 'uploads');
@@ -36,20 +40,20 @@ const pythonExecutable = path.join(__dirname, 'venv', 'Scripts', 'python.exe');
 const transcribeScript = path.join(__dirname, 'transcribe.py');
 const synthesizeScript = path.join(__dirname, 'synthesize.py');
 
-// Local faster-whisper STT
+// 1. Transcription Route
 app.post('/api/transcribe', upload.single('audio'), (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: 'No audio file uploaded.' });
     }
 
     const audioPath = path.resolve(req.file.path);
-    const lang = req.body.language || 'en';
+    const inputLang = req.body.language || '';
 
-    console.log(`[STT] Processing audio for language: ${lang}`);
+    console.log(`[STT] Processing audio (Language constraint: ${inputLang || 'auto'})...`);
 
     execFile(
         pythonExecutable,
-        [transcribeScript, audioPath, lang],
+        [transcribeScript, audioPath, inputLang],
         { maxBuffer: 1024 * 1024 * 10 },
         (error, stdout, stderr) => {
             if (fs.existsSync(audioPath)) {
@@ -61,14 +65,23 @@ app.post('/api/transcribe', upload.single('audio'), (req, res) => {
                 return res.status(500).json({ error: 'Transcription failed' });
             }
 
-            const transcript = stdout.trim();
-            console.log(`[STT Output - ${lang}]:`, transcript);
-            res.json({ transcript });
+            try {
+                const result = JSON.parse(stdout.trim());
+                console.log(`[STT Output - ${result.detected_language} (${result.detected_code})]:`, result.transcript);
+                res.json({
+                    transcript: result.transcript,
+                    detectedLanguage: result.detected_language,
+                    detectedCode: result.detected_code,
+                });
+            } catch (parseErr) {
+                console.error('Failed to parse STT output:', stdout);
+                res.status(500).json({ error: 'Invalid transcription format' });
+            }
         }
     );
 });
 
-// Local edge-tts TTS
+// 2. Translation & Synthesis Route
 app.post('/api/synthesize', (req, res) => {
     const { text, voiceCode } = req.body;
 
@@ -77,13 +90,41 @@ app.post('/api/synthesize', (req, res) => {
     }
 
     const outputPath = path.join(uploadDir, `tts_${Date.now()}.mp3`);
+    const pyProcess = spawn(pythonExecutable, [synthesizeScript]);
 
-    execFile(pythonExecutable, [synthesizeScript, text, voiceCode, outputPath], (error, stdout, stderr) => {
-        if (error) {
-            console.error('TTS error:', stderr || error.message);
+    const payload = JSON.stringify({
+        text,
+        voiceCode,
+        outputPath,
+    });
+
+    let stdoutData = '';
+    let stderrData = '';
+
+    pyProcess.stdin.write(payload);
+    pyProcess.stdin.end();
+
+    pyProcess.stdout.on('data', (data) => {
+        stdoutData += data.toString();
+    });
+
+    pyProcess.stderr.on('data', (data) => {
+        stderrData += data.toString();
+    });
+
+    pyProcess.on('close', (code) => {
+        if (code !== 0) {
+            console.error('TTS error:', stderrData);
             return res.status(500).json({ error: 'Speech synthesis failed' });
         }
 
+        let translatedText = text;
+        try {
+            const parsed = JSON.parse(stdoutData.trim());
+            translatedText = parsed.translated_text;
+        } catch (_) { }
+
+        res.setHeader('X-Translated-Text', encodeURIComponent(translatedText));
         res.sendFile(outputPath, (err) => {
             if (fs.existsSync(outputPath)) {
                 fs.unlinkSync(outputPath);
