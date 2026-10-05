@@ -23,7 +23,14 @@ def extract_audio(input_path: str, output_wav_path: str):
         "-vn", "-ar", "16000", "-ac", "1",
         output_wav_path
     ]
-    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # stdin/stdout/stderr mapped safely for all platforms
+    subprocess.run(
+        command,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL
+    )
 
 def transcribe(input_audio_path: str, chosen_lang: str = None):
     temp_audio_path = input_audio_path.rsplit(".", 1)[0] + "_audio.wav"

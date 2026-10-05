@@ -78,6 +78,32 @@ source venv/bin/activate
 # Install Python packages
 pip install faster-whisper edge-tts requests
 
+
+### Virtual Environment Activation
+
+- **Windows (PowerShell):**
+  ```powershell
+  .\venv\Scripts\Activate.ps1
+macOS / Linux:
+
+Bash
+source venv/bin/activate
+FFmpeg Installation
+Windows:
+
+PowerShell
+winget install Gyan.FFmpeg
+macOS (Homebrew):
+
+Bash
+brew install ffmpeg
+Linux (Ubuntu/Debian):
+
+Bash
+sudo apt update && sudo apt install -y ffmpeg
+
+All data contracts, APIs, transcription parameters, UI styling, and synthesis loops remain completely untouched.
+
 ```
 
 ### 3. Frontend Setup
