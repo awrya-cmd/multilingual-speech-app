@@ -1,4 +1,3 @@
-```markdown
 # Multilingual Speech Translation Loop
 
 A 100% free, end-to-end speech-to-speech translation loop built with React (Vite), Node.js Express, `faster-whisper`, and `edge-tts`.
@@ -126,7 +125,3 @@ npm run dev
 3. **Translation**: The transcript translates automatically to the selected target language.
 4. **TTS (Text-to-Speech)**: `synthesize.py` uses Microsoft Edge Neural Voice models to generate clean `.mp3` audio.
 5. **Interactive Loop**: Any edits made inside the transcript textarea automatically translate and re-synthesize speech after you pause typing.
-
-```
-
-```
